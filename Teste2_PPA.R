@@ -9,7 +9,11 @@ library(dplyr)
 
 # Carregar os dados
 dados <- read_excel("BANCO_PPA.xlsx", sheet = 1)  # Planilha principal
-dados_desdobramento <- read_excel("BANCO_PPA.xlsx", sheet = "Desdobramento")  # Nova aba
+dados_desdobramento <- read_excel("BANCO_PPA.xlsx", sheet = 2)  # Nova aba
+dados_atividade <- read_excel("BANCO_PPA.xlsx", sheet = 3)  # Nova aba
+
+
+
 
 # Limpar espaços em branco extras (boa prática)
 dados$SETOR <- trimws(dados$SETOR)
@@ -18,7 +22,7 @@ dados_desdobramento$REGIAO <- trimws(dados_desdobramento$REGIAO)
 
 # Interface
 ui <- dashboardPage(
-  dashboardHeader(title = "PLANO PLURIANUAL 2021-2024", titleWidth = 400),
+  dashboardHeader(title = "PLANO PLURIANUAL 2020-2024", titleWidth = 400),
   
   dashboardSidebar(
                    tags$img(src = "detran1.jpeg", 
@@ -26,8 +30,8 @@ ui <- dashboardPage(
                             width = 230, 
                             heigth = 120),
     useShinyjs(),
-    selectInput("setor", "Setor:", choices = sort(unique(dados$SETOR)), selected = NULL),
-    selectInput("ano", "Ano:", choices = sort(unique(dados$ANO)), selected = NULL),
+    selectInput("setor", "SETOR:", choices = sort(unique(dados$SETOR)), sort(unique(dados$SETOR))[1]),
+    selectInput("ano", "ANO:", choices = sort(unique(dados$ANO)), selected = 2024),
     actionButton("reset", "LIMPAR FILTROS", icon = icon("redo"))
   ),
   
@@ -48,24 +52,46 @@ ui <- dashboardPage(
       tabPanel("MUNICÍPIOS ATENDIDOS",
                fluidRow(
                  column(3,
-                        selectInput("setor_desdob", "Setor:", choices = NULL, selected = NULL)
+                        selectInput("setor_desdob", "SETOR:", choices = NULL, selected = NULL)
                  ),
                  
                  column(3,
-                        selectInput("regiao_desdob", "Região:", choices = NULL, selected = NULL)
+                        selectInput("regiao_desdob", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')
                  ),
                  column(3,
-                        selectInput("ano_desdob", "Ano:", choices = NULL, selected = NULL)
+                        selectInput("ano_desdob", "ANO:", choices = NULL, selected = 2024)
                  ),
                  column(3,
-                        actionButton("reset_desdob", "Resetar Filtros Desdobramento", icon = icon("redo"))
+                        actionButton("reset_desdob", "LIMPAR FILTROS", icon = icon("redo"))
                  )
                ),
                br(),
                fluidRow(
                  column(12, withSpinner(DTOutput("tabela_desdobramento")))
                )
+      ),
+      tabPanel("ATIVIDADES",
+               fluidRow(
+                 column(3,
+                        selectInput("setor_atividade", "SETOR:", choices = NULL)
+                 ),
+                 column(3,
+                        selectInput("ano_atividade", "ANO:", choices = NULL, selected = 2024)
+                 ),
+                 column(3,
+                        actionButton("reset_atividade", "LIMPAR FILTROS", icon = icon("redo"))
+                 )
+               ),
+               br(),
+               fluidRow(
+                 column(12, withSpinner(DTOutput("tabela_atividade")))
+               )
       )
+      
+      
+      
+      
+      
     )
   )
 )
@@ -76,7 +102,7 @@ server <- function(input, output, session) {
   # Resetar os filtros
   observeEvent(input$reset, {
     updateSelectInput(session, "setor", choices = sort(unique(dados$SETOR)), selected = NULL)
-    updateSelectInput(session, "ano", choices = sort(unique(dados$ANO)), selected = NULL)
+    updateSelectInput(session, "ano", choices = sort(unique(dados$ANO)), selected = 2024)
   })
   
   # Dados filtrados - principal
@@ -123,7 +149,7 @@ server <- function(input, output, session) {
   observeEvent(input$reset_desdob, {
     updateSelectInput(session, "setor_desdob", choices = sort(unique(dados_desdobramento$SETOR)), selected = NULL)
     updateSelectInput(session, "regiao_desdob", choices = sort(unique(dados_desdobramento$REGIAO)), selected = NULL)
-    updateSelectInput(session, "ano_desdob", choices = sort(unique(dados_desdobramento$ANO)), selected = NULL)
+    updateSelectInput(session, "ano_desdob", choices = sort(unique(dados_desdobramento$ANO)), selected = 2024)
   })
   
   # Caixas de valor
@@ -235,10 +261,13 @@ server <- function(input, output, session) {
              REGIAO = "Total", 
              ANO = "Total")
     
+    # Garantir que 'ANO' em df e 'total_row' seja do mesmo tipo
     df$ANO <- as.character(df$ANO)
     total_row$ANO <- as.character(total_row$ANO)
     
-    df_com_total <- bind_rows(df, total_row)
+    # Remover as colunas SETOR e ANO da tabela de exibição
+    df_com_total <- bind_rows(df, total_row) %>%
+      select(-SETOR, -ANO)  # Excluindo SETOR e ANO da tabela para exibição
     
     datatable(df_com_total,
               extensions = 'Buttons',
@@ -249,7 +278,6 @@ server <- function(input, output, session) {
                 scrollX = TRUE
               ))
   })
-  
   
   
   

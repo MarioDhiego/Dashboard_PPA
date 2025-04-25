@@ -8,8 +8,10 @@ library(DT)
 library(readxl)
 library(dplyr)
 
-# Carregar os dados
-dados <- read_excel("BANCO_PPA.xlsx")
+# Carregar os Dados
+dados <- read_excel("BANCO_PPA.xlsx", sheet = "geral")
+dados2 <- read_excel("BANCO_PPA.xlsx", sheet = "Desdobramento")
+
 
 # Interface
 ui <- dashboardPage(
@@ -127,7 +129,7 @@ server <- function(input, output, session) {
         PERCENTUAL_FISICO
       )
     
-    datatable(dados_fisico, 
+    DT::datatable(dados_fisico, 
               extensions = 'Buttons',
               options = list(
                 pageLength = 12,

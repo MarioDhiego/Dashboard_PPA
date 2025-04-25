@@ -21,7 +21,7 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      width = 3,
+      width = 2,
       selectInput("setor", "Setor:", choices = sort(unique(dados$SETOR)), selected = NULL),
       selectInput("ano", "Ano:", choices = sort(unique(dados$ANO)), selected = NULL)
     ),
