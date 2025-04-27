@@ -1,15 +1,24 @@
+
+#----------------------------------- PACOTES ----------------------------------#
 library(shiny)
 library(shinydashboard)
+library(shinydashboardPlus)
 library(shinyjs)
+library(shinythemes)
 library(shinycssloaders)
+library(shinyWidgets)
+library(dashboardthemes)
 library(DT)
 library(readxl)
 library(dplyr)
+#------------------------------------------------------------------------------#
 
-# Carregar os dados
-dados <- read_excel("BANCO_PPA.xlsx", sheet = 1)  # Planilha principal
-dados_desdobramento <- read_excel("BANCO_PPA.xlsx", sheet = 2)  # Nova aba
-dados_atividade <- read_excel("BANCO_PPA.xlsx", sheet = 3)  # Nova aba
+#---------------------------------- DataFrame ---------------------------------#
+dados <- read_excel("BANCO_PPA.xlsx", sheet = 1)             
+dados_desdobramento <- read_excel("BANCO_PPA.xlsx", sheet = 2)  
+dados_atividade <- read_excel("BANCO_PPA.xlsx", sheet = 3)  
+#------------------------------------------------------------------------------#
+
 
 # Limpar espaços em branco extras
 dados$SETOR <- trimws(dados$SETOR)
@@ -20,15 +29,16 @@ dados_desdobramento$REGIAO <- trimws(dados_desdobramento$REGIAO)
 ui <- dashboardPage(
   dashboardHeader(title = "PLANO PLURIANUAL 2020-2024", titleWidth = 400),
   dashboardSidebar(
-    tags$img(src = "detran1.jpeg", width = 230, heigth = 120),
+    tags$img(src = "detran1.jpeg", width = 230, height = 140),
     useShinyjs(),
     selectInput("setor", "SETOR:", choices = sort(unique(dados$SETOR)), sort(unique(dados$SETOR))[1]),
     selectInput("ano", "ANO:", choices = sort(unique(dados$ANO)), selected = 2024),
-    actionButton("reset", "LIMPAR FILTROS", icon = icon("redo"))
+    actionButton("reset", "LIMPAR FILTROS", icon = icon("redo"), class = "btn btn-warning")
   ),
   dashboardBody(
+    shinyDashboardThemes(theme = "blue_gradient"),
     tabsetPanel(
-      tabPanel("INDICADORES",
+      tabPanel("INDICADORES", icon = icon("car"),
                fluidRow(
                  valueBoxOutput("box_fin_prev", width = 3),
                  valueBoxOutput("box_fin_real", width = 3),
@@ -40,7 +50,7 @@ ui <- dashboardPage(
                  column(12, withSpinner(DTOutput("tabela_fisico")))
                )
       ),
-      tabPanel("MUNICÍPIOS ATENDIDOS",
+      tabPanel("MUNICÍPIOS ATENDIDOS", icon = icon("globe"),
                fluidRow(
                  column(3, selectInput("setor_desdob", "SETOR:", choices = NULL)),
                  column(3, selectInput("regiao_desdob", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
@@ -52,11 +62,12 @@ ui <- dashboardPage(
                  column(12, withSpinner(DTOutput("tabela_desdobramento")))
                )
       ),
-      tabPanel("ATIVIDADES",
+      tabPanel("ATIVIDADES", icon = icon("calendar-check"),
                fluidRow(
                  column(3, selectInput("setor_atividade", "SETOR:", choices = NULL)),
                  column(3, selectInput("regiao_atividade", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
                  column(3, selectInput("ano_atividade", "ANO:", choices = NULL, selected = 2024)),
+                 column(3, selectInput("municipio_atividade", "MUNICÍPIO:", choices = NULL)),  # Filtro de município
                  column(3, actionButton("reset_atividade", "LIMPAR FILTROS", icon = icon("redo")))
                ),
                br(),
@@ -177,12 +188,14 @@ server <- function(input, output, session) {
     updateSelectInput(session, "setor_atividade", choices = sort(unique(dados_atividade$SETOR)), selected = NULL)
     updateSelectInput(session, "regiao_atividade", choices = sort(unique(dados_atividade$REGIAO)), selected = NULL)
     updateSelectInput(session, "ano_atividade", choices = sort(unique(dados_atividade$ANO)), selected = 2024)
+    updateSelectInput(session, "municipio_atividade", choices = sort(unique(dados_atividade$MUNICIPIO)), selected = NULL)  # Novo filtro
   })
   
   observeEvent(input$reset_atividade, {
     updateSelectInput(session, "setor_atividade", choices = sort(unique(dados_atividade$SETOR)), selected = NULL)
     updateSelectInput(session, "regiao_atividade", choices = sort(unique(dados_atividade$REGIAO)), selected = NULL)
     updateSelectInput(session, "ano_atividade", choices = sort(unique(dados_atividade$ANO)), selected = 2024)
+    updateSelectInput(session, "municipio_atividade", choices = sort(unique(dados_atividade$MUNICIPIO)), selected = NULL)  # Novo filtro
   })
   
   dados_atividade_filtrados <- reactive({
@@ -196,6 +209,9 @@ server <- function(input, output, session) {
     if (!is.null(input$ano_atividade) && input$ano_atividade != "") {
       df <- df %>% filter(ANO == input$ano_atividade)
     }
+    if (!is.null(input$municipio_atividade) && input$municipio_atividade != "") {  # Filtro de município
+      df <- df %>% filter(MUNICIPIO == input$municipio_atividade)
+    }
     df
   })
 
@@ -206,15 +222,41 @@ server <- function(input, output, session) {
       showNotification("NENHUMA INFORMAÇÃO para os filtros selecionados.", type = "warning")
       return(NULL)
     }
-    total_row <- df %>% select_if(is.numeric) %>% summarise(across(everything(), ~sum(., na.rm = TRUE))) %>%
+    
+    # Corrigido para ATIVIDADE
+    df <- df %>%
+      mutate(ATIVIDADE = case_when(
+        ATIVIDADE == "Palestra" ~ '<span class="badge badge-primary">Palestra</span>',
+        ATIVIDADE == "Curso" ~ '<span class="badge badge-success">Curso</span>',
+        ATIVIDADE == "Ação Educativa" ~ '<span class="badge badge-warning">Ação Educativa</span>',
+        ATIVIDADE == "Reunião Institucional" ~ '<span class="badge badge-secondary">Reunião</span>',
+        TRUE ~ ATIVIDADE
+      ))
+    
+    total_row <- df %>% 
+      select_if(is.numeric) %>% 
+      summarise(across(everything(), ~sum(., na.rm = TRUE))) %>%
       mutate(SETOR = "Total", REGIAO = "Total", ANO = "Total")
+    
     df$ANO <- as.character(df$ANO)
     total_row$ANO <- as.character(total_row$ANO)
-    df_com_total <- bind_rows(df, total_row) %>% select(-SETOR, -ANO)
-    datatable(df_com_total, extensions = 'Buttons', options = list(pageLength = 20, dom = 'Bfrtip',
-                                                                   buttons = c('copy', 'csv', 'excel', 'pdf', 'print'), 
-                                                                   scrollX = TRUE))
+    
+    df_com_total <- bind_rows(df, total_row) %>% select(-SETOR, -ANO, -REGIAO)
+    
+    datatable(df_com_total, 
+              escape = FALSE, # importante deixar FALSE para renderizar HTML dos badges
+              extensions = 'Buttons', 
+              options = list(pageLength = 20, dom = 'Bfrtip',
+                             buttons = c('copy', 'csv', 'excel', 'pdf', 'print'), 
+                             scrollX = TRUE,
+                             scrollY = "400px",  # Adicionando rolagem vertical
+                             searching = TRUE  # Habilita a pesquisa
+                             ))
   })
+#------------------------------------------------------------------------------#  
+  
+  
+ 
 }
 
 # Rodar o app
