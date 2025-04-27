@@ -54,9 +54,9 @@ ui <- dashboardPage(
       ),
       tabPanel("MUNICÍPIOS ATENDIDOS", icon = icon("globe"),
                fluidRow(
+                 column(2, selectInput("ano_desdob", "ANO:", choices = NULL, selected = 2024)),
                  column(2, selectInput("setor_desdob", "SETOR:", choices = NULL)),
                  column(3, selectInput("regiao_desdob", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
-                 column(2, selectInput("ano_desdob", "ANO:", choices = NULL, selected = 2024)),
                  column(3, actionButton("reset_desdob", "LIMPAR FILTROS", icon = icon("redo")))
                ),
                br(),
@@ -66,9 +66,9 @@ ui <- dashboardPage(
       ),
       tabPanel("ATIVIDADES", icon = icon("calendar-check"),
                fluidRow(
+                 column(2, selectInput("ano_atividade", "ANO:", choices = NULL, selected = 2024)),
                  column(2, selectInput("setor_atividade", "SETOR:", choices = NULL)),
                  column(3, selectInput("regiao_atividade", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
-                 column(2, selectInput("ano_atividade", "ANO:", choices = NULL, selected = 2024)),
                  column(2, selectInput("municipio_atividade", "MUNICÍPIO:", choices = NULL, selected = 'SANTARÉM')),
                  column(3, actionButton("reset_atividade", "LIMPAR FILTROS", icon = icon("redo")))
                ),
@@ -208,30 +208,34 @@ server <- function(input, output, session) {
   })
   #-----------------------------------------------------------------------------------------------------------------#
   observe({
-    updateSelectInput(session, "setor_atividade", choices = sort(unique(dados_atividade$SETOR)), selected = NULL)
-    updateSelectInput(session, "regiao_atividade", choices = sort(unique(dados_atividade$REGIAO)), selected = NULL)
     updateSelectInput(session, "ano_atividade", choices = sort(unique(dados_atividade$ANO)), selected = 2024)
+    updateSelectInput(session, "setor_atividade", choices = sort(unique(dados_atividade$SETOR)), selected = 'EDUCAÇÃO')
+    updateSelectInput(session, "regiao_atividade", choices = sort(unique(dados_atividade$REGIAO)), selected = 'BAIXO AMAZONAS')
     updateSelectInput(session, "municipio_atividade", choices = sort(unique(dados_atividade$MUNICIPIO)), selected = 'SANTARÉM')  # Novo filtro
   })
   
   observeEvent(input$reset_atividade, {
-    updateSelectInput(session, "setor_atividade", choices = sort(unique(dados_atividade$SETOR)), selected = NULL)
-    updateSelectInput(session, "regiao_atividade", choices = sort(unique(dados_atividade$REGIAO)), selected = NULL)
     updateSelectInput(session, "ano_atividade", choices = sort(unique(dados_atividade$ANO)), selected = 2024)
+    updateSelectInput(session, "setor_atividade", choices = sort(unique(dados_atividade$SETOR)), selected = 'EDUCAÇÃO')
+    updateSelectInput(session, "regiao_atividade", choices = sort(unique(dados_atividade$REGIAO)), selected = 'BAIXO AMAZONAS')
     updateSelectInput(session, "municipio_atividade", choices = sort(unique(dados_atividade$MUNICIPIO)), selected = 'SANTARÉM')  # Novo filtro
   })
   
   dados_atividade_filtrados <- reactive({
     df <- dados_atividade
-    if (!is.null(input$setor_atividade) && input$setor_atividade != "") {
-      df <- df %>% filter(SETOR == input$setor_atividade)
-    }
-    if (!is.null(input$regiao_atividade) && input$regiao_atividade != "") {
-      df <- df %>% filter(REGIAO == input$regiao_atividade)
-    }
+    
     if (!is.null(input$ano_atividade) && input$ano_atividade != "") {
       df <- df %>% filter(ANO == input$ano_atividade)
     }
+    
+    if (!is.null(input$setor_atividade) && input$setor_atividade != "") {
+      df <- df %>% filter(SETOR == input$setor_atividade)
+    }
+    
+    if (!is.null(input$regiao_atividade) && input$regiao_atividade != "") {
+      df <- df %>% filter(REGIAO == input$regiao_atividade)
+    }
+    
     if (!is.null(input$municipio_atividade) && input$municipio_atividade != "") {  # Filtro de município
       df <- df %>% filter(MUNICIPIO == input$municipio_atividade)
     }
@@ -259,7 +263,7 @@ server <- function(input, output, session) {
     total_row <- df %>% 
       select_if(is.numeric) %>% 
       summarise(across(everything(), ~sum(., na.rm = TRUE))) %>%
-      mutate(SETOR = "Total", REGIAO = "Total", ANO = "Total")
+      mutate(ANO = "Total", SETOR = "Total", REGIAO = "Total", )
     
     df$ANO <- as.character(df$ANO)
     total_row$ANO <- as.character(total_row$ANO)
