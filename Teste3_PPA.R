@@ -1,4 +1,6 @@
 
+
+
 #----------------------------------- PACOTES ----------------------------------#
 library(shiny)
 library(shinydashboard)
@@ -52,9 +54,9 @@ ui <- dashboardPage(
       ),
       tabPanel("MUNICÍPIOS ATENDIDOS", icon = icon("globe"),
                fluidRow(
-                 column(3, selectInput("setor_desdob", "SETOR:", choices = NULL)),
+                 column(2, selectInput("setor_desdob", "SETOR:", choices = NULL)),
                  column(3, selectInput("regiao_desdob", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
-                 column(3, selectInput("ano_desdob", "ANO:", choices = NULL, selected = 2024)),
+                 column(2, selectInput("ano_desdob", "ANO:", choices = NULL, selected = 2024)),
                  column(3, actionButton("reset_desdob", "LIMPAR FILTROS", icon = icon("redo")))
                ),
                br(),
@@ -64,17 +66,26 @@ ui <- dashboardPage(
       ),
       tabPanel("ATIVIDADES", icon = icon("calendar-check"),
                fluidRow(
-                 column(3, selectInput("setor_atividade", "SETOR:", choices = NULL)),
+                 column(2, selectInput("setor_atividade", "SETOR:", choices = NULL)),
                  column(3, selectInput("regiao_atividade", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
-                 column(3, selectInput("ano_atividade", "ANO:", choices = NULL, selected = 2024)),
-                 column(3, selectInput("municipio_atividade", "MUNICÍPIO:", choices = NULL)),  # Filtro de município
+                 column(2, selectInput("ano_atividade", "ANO:", choices = NULL, selected = 2024)),
+                 column(2, selectInput("municipio_atividade", "MUNICÍPIO:", choices = NULL, selected = 'SANTARÉM')),
                  column(3, actionButton("reset_atividade", "LIMPAR FILTROS", icon = icon("redo")))
+               ),
+               br(),
+               fluidRow(
+                 # Linha separada para o valueBox
+                 # valueBoxOutput("pessoas_atendidas", width = 12)  # Ocupa toda a linha
                ),
                br(),
                fluidRow(
                  column(12, withSpinner(DTOutput("tabela_atividade")))
                )
       )
+      
+      
+      
+      
     )
   )
 )
@@ -107,18 +118,30 @@ server <- function(input, output, session) {
   })
   
   observe({
-    updateSelectInput(session, "setor_desdob", choices = sort(unique(dados_desdobramento$SETOR)), selected = NULL)
-    updateSelectInput(session, "regiao_desdob", choices = sort(unique(dados_desdobramento$REGIAO)), selected = NULL)
+    updateSelectInput(session, "setor_desdob", choices = sort(unique(dados_desdobramento$SETOR)), selected = 'EDUCAÇÃO')
+    updateSelectInput(session, "regiao_desdob", choices = sort(unique(dados_desdobramento$REGIAO)), selected = 'BAIXO AMAZONAS')
     updateSelectInput(session, "ano_desdob", choices = sort(unique(dados_desdobramento$ANO)), selected = 2024)
   })
   
   observeEvent(input$reset_desdob, {
-    updateSelectInput(session, "setor_desdob", choices = sort(unique(dados_desdobramento$SETOR)), selected = NULL)
-    updateSelectInput(session, "regiao_desdob", choices = sort(unique(dados_desdobramento$REGIAO)), selected = NULL)
+    updateSelectInput(session, "setor_desdob", choices = sort(unique(dados_desdobramento$SETOR)), selected = 'EDUCAÇÃO')
+    updateSelectInput(session, "regiao_desdob", choices = sort(unique(dados_desdobramento$REGIAO)), selected = 'BAIXO AMAZONAS')
     updateSelectInput(session, "ano_desdob", choices = sort(unique(dados_desdobramento$ANO)), selected = 2024)
   })
   
-#--------------------------------------- CAIXAS DE VALORES ---------------------------------------------------#
+  #--------------------------------------- CAIXAS DE VALORES ---------------------------------------------------#
+  # Cálculo do total de atividades filtradas
+  
+  #output$total_atividades <- renderValueBox({
+  #   total_atividades <- nrow(dados_atividade_filtrados())  # Total de atividades filtradas
+  #  valueBox(total_atividades,
+  #           "Atividades Realizadas",
+  #           icon = icon("calendar-check"),
+  #           color = "blue", 
+  #           width = 2)  # Ocupa toda a largura disponível
+  # })
+  
+  
   output$box_fin_prev <- renderValueBox({
     total <- sum(dados_filtrados()$FINANCEIRO_PREVISTO, na.rm = TRUE)
     valueBox("R$ " %>% paste0(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 2)),
@@ -142,8 +165,8 @@ server <- function(input, output, session) {
     valueBox(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 0),
              "Execução Física - Realizado (un)", icon = icon("chart-bar"), color = "orange")
   })
-#------------------------------------------------------------------------------------------------------------#
-
+  #------------------------------------------------------------------------------------------------------------#
+  
   
   #----------------- TABELA INDICADORES ---------------------------------------------------------------------#
   output$tabela_fisico <- renderDT({
@@ -167,7 +190,7 @@ server <- function(input, output, session) {
                   backgroundSize = '100% 90%', backgroundRepeat = 'no-repeat', backgroundPosition = 'center')
   })
   
-#----------------- TABELA MUNICPIPIOS ATENDIDOS -------------------------------------------------------------#
+  #----------------- TABELA MUNICPIPIOS ATENDIDOS -------------------------------------------------------------#
   output$tabela_desdobramento <- renderDT({
     df <- dados_desdobramento_filtrados()
     if (nrow(df) == 0) {
@@ -188,14 +211,14 @@ server <- function(input, output, session) {
     updateSelectInput(session, "setor_atividade", choices = sort(unique(dados_atividade$SETOR)), selected = NULL)
     updateSelectInput(session, "regiao_atividade", choices = sort(unique(dados_atividade$REGIAO)), selected = NULL)
     updateSelectInput(session, "ano_atividade", choices = sort(unique(dados_atividade$ANO)), selected = 2024)
-    updateSelectInput(session, "municipio_atividade", choices = sort(unique(dados_atividade$MUNICIPIO)), selected = NULL)  # Novo filtro
+    updateSelectInput(session, "municipio_atividade", choices = sort(unique(dados_atividade$MUNICIPIO)), selected = 'SANTARÉM')  # Novo filtro
   })
   
   observeEvent(input$reset_atividade, {
     updateSelectInput(session, "setor_atividade", choices = sort(unique(dados_atividade$SETOR)), selected = NULL)
     updateSelectInput(session, "regiao_atividade", choices = sort(unique(dados_atividade$REGIAO)), selected = NULL)
     updateSelectInput(session, "ano_atividade", choices = sort(unique(dados_atividade$ANO)), selected = 2024)
-    updateSelectInput(session, "municipio_atividade", choices = sort(unique(dados_atividade$MUNICIPIO)), selected = NULL)  # Novo filtro
+    updateSelectInput(session, "municipio_atividade", choices = sort(unique(dados_atividade$MUNICIPIO)), selected = 'SANTARÉM')  # Novo filtro
   })
   
   dados_atividade_filtrados <- reactive({
@@ -214,7 +237,7 @@ server <- function(input, output, session) {
     }
     df
   })
-
+  
   #----------------- TABELA ATIVIDADES ----------------------------------------------------------------------#
   output$tabela_atividade <- renderDT({
     df <- dados_atividade_filtrados()
@@ -251,12 +274,12 @@ server <- function(input, output, session) {
                              scrollX = TRUE,
                              scrollY = "400px",  # Adicionando rolagem vertical
                              searching = TRUE  # Habilita a pesquisa
-                             ))
+              ))
   })
-#------------------------------------------------------------------------------#  
+  #------------------------------------------------------------------------------#  
   
   
- 
+  
 }
 
 # Rodar o app
