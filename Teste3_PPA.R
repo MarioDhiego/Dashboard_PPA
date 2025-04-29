@@ -17,6 +17,7 @@ library(dplyr)
 dados <- read_excel("BANCO_PPA.xlsx", sheet = 1)             
 dados_desdobramento <- read_excel("BANCO_PPA.xlsx", sheet = 2)  
 dados_atividade <- read_excel("BANCO_PPA.xlsx", sheet = 3)  
+dados_nao_executado <- read_excel("BANCO_PPA.xlsx", sheet = 4)
 #------------------------------------------------------------------------------#
 
 
@@ -79,11 +80,27 @@ ui <- dashboardPage(
                fluidRow(
                  column(12, withSpinner(DTOutput("tabela_atividade")))
                )
-      )
+      ),
+      
+    tabPanel("NÃO EXECUTADO", icon = icon("times-circle"),
+         fluidRow(
+           column(2, selectInput("ano_nao_exec", "ANO:", choices = NULL, selected = 2024)),
+           column(2, selectInput("setor_nao_exec", "SETOR:", choices = NULL, selected = "EDUCAÇÃO")),
+           column(2, selectInput("regiao_nao_exec", "REGIÃO INTEGRAÇÃO:", choices = NULL)),
+           #column(2, selectInput("municipio_nao_exec", "MUNICÍPIO:", choices = NULL, selected = 'ALENQUER')),
+           column(2, actionButton("reset_nao_exec", "LIMPAR FILTROS", icon = icon("redo"))),
+           column(2, valueBoxOutput("box_previsto_nao_exec", width = 12)),
+           column(2, valueBoxOutput("total_financeiro_previsto_nao_exec", width = 12))
+         ),
+         br(),
+         fluidRow(
+           column(12, withSpinner(DTOutput("tabela_nao_executado")))
+         )
+)
+
       
       
-      
-      
+ 
     )
   )
 )
@@ -126,6 +143,124 @@ server <- function(input, output, session) {
     updateSelectInput(session, "regiao_desdob", choices = sort(unique(dados_desdobramento$REGIAO)), selected = 'BAIXO AMAZONAS')
     updateSelectInput(session, "ano_desdob", choices = sort(unique(dados_desdobramento$ANO)), selected = 2024)
   })
+  
+  
+  
+  # Atualiza filtros com valores únicos
+  observe({
+    updateSelectInput(session, "ano_nao_exec", choices = sort(unique(dados_nao_executado$ANO)), selected = 2024)
+    updateSelectInput(session, "setor_nao_exec", choices = sort(unique(dados_nao_executado$SETOR)), selected = "EDUCAÇÃO")
+    updateSelectInput(session, "regiao_nao_exec", choices = sort(unique(dados_nao_executado$REGIAO)), selected = NULL)
+    updateSelectInput(session, "municipio_nao_exec", choices = sort(unique(dados_nao_executado$MUNICIPIO)), selected = NULL)
+  })
+#------------------------------------------------------------------------------------------------#
+
+  observe({
+    if (!is.null(input$regiao_nao_exec) && input$regiao_nao_exec != "") {
+      municipios_filtrados <- dados_nao_executado %>%
+        filter(REGIAO == input$regiao_nao_exec) %>%
+        pull(MUNICIPIO) %>%
+        unique() %>%
+        sort()
+      updateSelectInput(session, "municipio_nao_exec", choices = municipios_filtrados, selected = municipios_filtrados[1])
+    } else {
+      updateSelectInput(session, "municipio_nao_exec", choices = sort(unique(dados_nao_executado$MUNICIPIO)))
+    }
+  })
+
+#------------------------------------------------------------------------------------------------#
+# Botão de reset
+  observeEvent(input$reset_nao_exec, {
+    updateSelectInput(session, "ano_nao_exec", choices = sort(unique(dados_nao_executado$ANO)), selected = 2024)
+    updateSelectInput(session, "setor_nao_exec", choices = sort(unique(dados_nao_executado$SETOR)), selected = "EDUCAÇÃO")
+    updateSelectInput(session, "regiao_nao_exec", choices = sort(unique(dados_nao_executado$REGIAO)), selected = NULL)
+    updateSelectInput(session, "municipio_nao_exec", choices = sort(unique(dados_nao_executado$MUNICIPIO)), selected = NULL)
+  })
+#------------------------------------------------------------------------------------------------#
+
+
+
+
+#------------------------------------------------------------------------------------------------#
+# Dados filtrados
+  dados_nao_exec_filtrados <- reactive({
+    df <- dados_nao_executado
+    if (!is.null(input$ano_nao_exec)) df <- df %>% filter(ANO == input$ano_nao_exec)
+    if (!is.null(input$setor_nao_exec)) df <- df %>% filter(SETOR == input$setor_nao_exec)
+    if (!is.null(input$regiao_nao_exec)) df <- df %>% filter(REGIAO == input$regiao_nao_exec)
+    #if (!is.null(input$municipio_nao_exec)) df <- df %>% filter(MUNICIPIO == input$municipio_nao_exec)
+    df
+  })
+#------------------------------------------------------------------------------------------------#
+
+
+
+
+# Tabela renderizada
+output$tabela_nao_executado <- renderDT({
+  df <- dados_nao_exec_filtrados()
+  if (nrow(df) == 0) {
+    showNotification("Nenhum dado encontrado para os filtros selecionados.", type = "warning")
+    return(NULL)
+  }
+  
+  datatable(df,
+            extensions = 'Buttons',
+            options = list(pageLength = 15,
+                           dom = 'Bfrtip',
+                           buttons = c('copy', 'csv', 'excel', 'pdf', 'print')),
+            rownames = FALSE)
+})
+
+  
+  
+  
+output$box_previsto_nao_exec <- renderValueBox({
+  df <- dados_nao_exec_filtrados()
+  total_previsto <- sum(df$FINANCEIRO_PREVISTO, na.rm = TRUE)
+  
+  valueBox(
+    subtitle = "Financeiro Previsto (Não Executado)",
+    value = scales::dollar(total_previsto, prefix = "R$ ", big.mark = ".", decimal.mark = ","),
+    icon = icon("money-bill-wave"),
+    color = "red"
+  )
+})
+  
+# Dados reativos filtrados
+df_nao_executado <- reactive({
+  df <- subset(dados, `SITUAÇÃO` == "NÃO EXECUTADO")
+  
+  if (input$regiao_nao_exec != "Todos") {
+    df <- df[df$`REGIÃO INTEGRAÇÃO` == input$regiao_nao_exec, ]
+  }
+  
+  if (!is.null(input$municipio_nao_exec) && input$municipio_nao_exec != "Todos") {
+    df <- df[df$MUNICÍPIO == input$municipio_nao_exec, ]
+  }
+  
+  df
+})
+  
+# valueBox: Total Financeiro Previsto (geral)
+output$total_financeiro_previsto_nao_exec <- renderValueBox({
+  df <- dados_nao_executado
+  total_nao_exec <- sum(df$FINANCEIRO_PREVISTO, na.rm = TRUE)
+  
+  valueBox(
+    formatC(total_nao_exec, format = "f", big.mark = ".", digits = 0),
+    subtitle = "Total Financeiro Previsto (Todos Municípios)",
+    value = scales::dollar( total_nao_exec, big.mark = ".", decimal.mark = ",", prefix = "R$ "),
+    icon = icon("coins"),
+    color = "blue"
+  )
+})
+  
+  
+  
+  
+  
+  
   
   #--------------------------------------- CAIXAS DE VALORES ---------------------------------------------------#
   # Cálculo do total de atividades filtradas
