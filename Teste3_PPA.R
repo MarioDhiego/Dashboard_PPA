@@ -87,7 +87,7 @@ ui <- dashboardPage(
            column(2, selectInput("ano_nao_exec", "ANO:", choices = NULL, selected = 2024)),
            column(2, selectInput("setor_nao_exec", "SETOR:", choices = NULL, selected = "EDUCAÇÃO")),
            column(2, selectInput("regiao_nao_exec", "REGIÃO INTEGRAÇÃO:", choices = NULL)),
-           #column(2, selectInput("municipio_nao_exec", "MUNICÍPIO:", choices = NULL, selected = 'ALENQUER')),
+           #column(2, selectInput("municipio_nao_exec", "MUNICÍPIO:", choices = NULL)),
            column(2, actionButton("reset_nao_exec", "LIMPAR FILTROS", icon = icon("redo"))),
            column(2, valueBoxOutput("box_previsto_nao_exec", width = 12)),
            column(2, valueBoxOutput("total_financeiro_previsto_nao_exec", width = 12))
@@ -243,18 +243,17 @@ df_nao_executado <- reactive({
 })
   
 # valueBox: Total Financeiro Previsto (geral)
-output$total_financeiro_previsto_nao_exec <- renderValueBox({
-  df <- dados_nao_executado
-  total_nao_exec <- sum(df$FINANCEIRO_PREVISTO, na.rm = TRUE)
-  
-  valueBox(
-    formatC(total_nao_exec, format = "f", big.mark = ".", digits = 0),
-    subtitle = "Total Financeiro Previsto (Todos Municípios)",
-    value = scales::dollar( total_nao_exec, big.mark = ".", decimal.mark = ",", prefix = "R$ "),
-    icon = icon("coins"),
-    color = "blue"
-  )
-})
+#output$total_financeiro_previsto_nao_exec <- renderValueBox({
+#  df <- dados_nao_exec_filtrados()
+#  total <- sum(df$FINANCEIRO_PREVISTO, na.rm = TRUE)  # Ajuste conforme necessidade
+#  
+#  valueBox(
+#    subtitle = "Outro Indicador",  # Ajuste o título conforme desejado
+#    value = scales::dollar(total, prefix = "R$ ", big.mark = ".", decimal.mark = ","),
+#    icon = icon("chart-line"),
+#    color = "orange"
+#  )
+#})
   
   
   
