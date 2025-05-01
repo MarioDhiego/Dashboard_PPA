@@ -136,7 +136,7 @@ server <- function(input, output, session) {
     valueBox(
       #value = paste("R$", scales::comma(total_setor, accuracy = 1)),
       value = HTML(paste0('<span style="font-size:24px">R$ ', format(total_setor, big.mark = ".", decimal.mark = ","), '</span>')),
-      subtitle = "Total Geral",
+      subtitle = "Não Executado(TOTAL)",
       icon = icon("industry"),
       color = "blue"
     )
@@ -262,7 +262,7 @@ output$box_previsto_nao_exec <- renderValueBox({
   total_previsto <- sum(df$FINANCEIRO_PREVISTO, na.rm = TRUE)
   
   valueBox(
-    subtitle = "Financeiro(Não Executado)",
+    subtitle = "Não Executado(REGIÃO)",
     value = HTML(paste0('<span style="font-size:24px">R$ ', format(total_previsto, big.mark = ".", decimal.mark = ","), '</span>')),
     #value = scales::dollar(total_previsto, prefix = "R$ ", big.mark = ".", decimal.mark = ","),
     icon = icon("money-bill-wave"),
