@@ -11,6 +11,8 @@ library(dashboardthemes)
 library(DT)
 library(readxl)
 library(dplyr)
+library(tm)
+library(wordcloud)
 #------------------------------------------------------------------------------#
 
 #---------------------------------- DataFrame ---------------------------------#
@@ -29,21 +31,21 @@ dados_desdobramento$REGIAO <- trimws(dados_desdobramento$REGIAO)
 # Interface
 ui <- dashboardPage(
   dashboardHeader(
-    title = "PANORAMA DO PLANO PLURIANUAL", titleWidth = 400),
+    title = "PAINEL DE MONITORAMENTO PPA", titleWidth = 400),
   dashboardSidebar(
     tags$img(src = "detran1.jpeg", width = 230, height = 140),
     useShinyjs(),
     selectInput("setor", "SETOR:", choices = sort(unique(dados$SETOR)), sort(unique(dados$SETOR))[1]),
     selectInput("ano", "ANO:", choices = sort(unique(dados$ANO)), selected = 2024),
-    actionButton("reset", "LIMPAR FILTROS", icon = icon("redo"), class = "btn btn-warning")
+    actionButton("reset", "REINICIAR", icon = icon("redo"), class = "btn btn-warning")
   ),
   dashboardBody(
     shinyDashboardThemes(theme = "blue_gradient"),
     tabsetPanel(
-      tabPanel("INDICADORES", icon = icon("car"),
+      tabPanel("PANORAMA GERAL", icon = icon("car"),
                fluidRow(
-                 valueBoxOutput("box_fin_prev", width = 3),
-                 valueBoxOutput("box_fin_real", width = 3),
+                 valueBoxOutput("box_fin_prev", width = 2),
+                 valueBoxOutput("box_fin_real", width = 2),
                  valueBoxOutput("box_fis_prev", width = 2),
                  valueBoxOutput("box_fis_real", width = 2),
                  valueBoxOutput("box_execucao_total", width = 2)
@@ -58,7 +60,7 @@ ui <- dashboardPage(
                  column(2, selectInput("ano_desdob", "ANO:", choices = NULL, selected = 2024)),
                  column(2, selectInput("setor_desdob", "SETOR:", choices = NULL)),
                  column(3, selectInput("regiao_desdob", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
-                 column(3, actionButton("reset_desdob", "LIMPAR FILTROS", icon = icon("redo")))
+                 column(3, actionButton("reset_desdob", "REINICIAR", icon = icon("redo")))
                ),
                br(),
                fluidRow(
@@ -71,7 +73,7 @@ ui <- dashboardPage(
                  column(2, selectInput("setor_atividade", "SETOR:", choices = NULL)),
                  column(2, selectInput("regiao_atividade", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
                  column(3, selectInput("municipio_atividade", "MUNICÍPIO:", choices = NULL, selected = 'SANTARÉM')),
-                 column(3, actionButton("reset_atividade", "LIMPAR FILTROS", icon = icon("redo")))
+                 column(3, actionButton("reset_atividade", "REINICIAR", icon = icon("redo")))
                ),
                br(),
                fluidRow(
@@ -84,7 +86,7 @@ ui <- dashboardPage(
                  column(1, selectInput("ano_nao_exec", "ANO:", choices = NULL, selected = 2024)),
                  column(2, selectInput("setor_nao_exec", "SETOR:", choices = NULL, selected = "EDUCAÇÃO")),
                  column(2, selectInput("regiao_nao_exec", "REGIÃO INTEGRAÇÃO:", choices = NULL)),
-                 column(1, actionButton("reset_nao_exec", "LIMPAR", icon = icon("redo"))),
+                 column(1, actionButton("reset_nao_exec", "REINICIAR", icon = icon("redo"))),
                  column(3, valueBoxOutput("box_previsto_nao_exec", width = 12)),
                  column(3, valueBoxOutput("total_setor", width = 12))
                ),
@@ -96,7 +98,6 @@ ui <- dashboardPage(
     )
   )
 )
-
 # Servidor
 server <- function(input, output, session) {
   
@@ -108,14 +109,12 @@ server <- function(input, output, session) {
       pull(total)
     
     valueBox(
-      subtitle = "Realizado Geral (R$)",
-      value = HTML(paste0('<span style="font-size:22px">R$ ', format(total_exec_real, big.mark = ".", decimal.mark = ","), '</span>')),
+      subtitle = "Realizado Total (R$)",
+      value = HTML(paste0('<span style="font-size:24px">R$ ', format(total_exec_real, format = "f", big.mark = ".", decimal.mark = ","), '</span>')),
       icon = icon("coins"),
-      color = "purple"
+      color = "red"
     )
   })
-  
-  
   
   
   output$total_setor <- renderValueBox({
@@ -135,7 +134,7 @@ server <- function(input, output, session) {
     # Cria o valueBox para o total geral do setor
     valueBox(
       #value = paste("R$", scales::comma(total_setor, accuracy = 1)),
-      value = HTML(paste0('<span style="font-size:24px">R$ ', format(total_setor, big.mark = ".", decimal.mark = ","), '</span>')),
+      value = HTML(paste0('<span style="font-size:25px">R$ ', format(total_setor, format = "f", big.mark = ".", decimal.mark = ","), '</span>')),
       subtitle = "Não Executado(TOTAL)",
       icon = icon("industry"),
       color = "blue"
@@ -143,13 +142,6 @@ server <- function(input, output, session) {
   })
 
 
-  
-  
-  
-  
-  
-  
-  
   
   observeEvent(input$reset, {
     updateSelectInput(session, "setor", choices = sort(unique(dados$SETOR)), selected = NULL)
@@ -186,8 +178,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "regiao_desdob", choices = sort(unique(dados_desdobramento$REGIAO)), selected = 'BAIXO AMAZONAS')
     updateSelectInput(session, "ano_desdob", choices = sort(unique(dados_desdobramento$ANO)), selected = 2024)
   })
-  
-  
+
   
   # Atualiza filtros com valores únicos
   observe({
@@ -222,8 +213,6 @@ server <- function(input, output, session) {
 #------------------------------------------------------------------------------------------------#
 
 
-
-
 #------------------------------------------------------------------------------------------------#
 # Dados filtrados
   dados_nao_exec_filtrados <- reactive({
@@ -250,20 +239,19 @@ output$tabela_nao_executado <- renderDT({
             extensions = 'Buttons',
             options = list(pageLength = 15,
                            dom = 'Bfrtip',
-                           buttons = c('copy', 'csv', 'excel', 'pdf', 'print')),
+                           buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                           searching = FALSE),
             rownames = FALSE)
 })
 
-  
-  
-  
+
 output$box_previsto_nao_exec <- renderValueBox({
   df <- dados_nao_exec_filtrados()
   total_previsto <- sum(df$FINANCEIRO_PREVISTO, na.rm = TRUE)
   
   valueBox(
     subtitle = "Não Executado(REGIÃO)",
-    value = HTML(paste0('<span style="font-size:24px">R$ ', format(total_previsto, big.mark = ".", decimal.mark = ","), '</span>')),
+    value = HTML(paste0('<span style="font-size:25px">R$ ', format(total_previsto, format = "f", big.mark = ".", decimal.mark = ","), '</span>')),
     #value = scales::dollar(total_previsto, prefix = "R$ ", big.mark = ".", decimal.mark = ","),
     icon = icon("money-bill-wave"),
     color = "red"
@@ -277,25 +265,25 @@ output$box_previsto_nao_exec <- renderValueBox({
 #--------------------------------------- CAIXAS DE VALORES ---------------------------------------------------#
   output$box_fin_prev <- renderValueBox({
     total <- sum(dados_filtrados()$FINANCEIRO_PREVISTO, na.rm = TRUE)
-    valueBox("R$ " %>% paste0(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 2)),
-             "Previsto (R$)", icon = icon("money-bill"), color = "blue")
+    valueBox(HTML(paste0('<span style="font-size:26px"> R$ ', format(total, format = "f", big.mark = ".", decimal.mark = ","), '</span>')),
+             "Previsto no ANO (R$)", icon = icon("money-bill"), color = "blue")
   })
   
   output$box_fin_real <- renderValueBox({
     total <- sum(dados_filtrados()$FINANCEIRO_REALIZADO, na.rm = TRUE)
-    valueBox("R$ " %>% paste0(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 2)),
-             "Realizado (R$)", icon = icon("check-circle"), color = "green")
+    valueBox(HTML(paste0('<span style="font-size:26px"> R$ ', format(total, format = "f", big.mark = ".", decimal.mark = ","), '</span>')),
+             "Realizado no ANO (R$)", icon = icon("check-circle"), color = "green")
   })
   
   output$box_fis_prev <- renderValueBox({
     total <- sum(dados_filtrados()$FISICO_PREVISTO, na.rm = TRUE)
-    valueBox(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 0),
+    valueBox(HTML(paste0('<span style="font-size:26px"> R$ ', format(total, format = "f", big.mark = ".", decimal.mark = ","), '</span>')),
              "Previsto (Físico)", icon = icon("chart-line"), color = "teal")
   })
   
   output$box_fis_real <- renderValueBox({
     total <- sum(dados_filtrados()$FISICO_REALIZADO, na.rm = TRUE)
-    valueBox(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 0),
+    valueBox(HTML(paste0('<span style="font-size:26px"> R$ ', format(total, format = "f", big.mark = ".", decimal.mark = ","), '</span>')),
              "Realizado (Físico)", icon = icon("chart-bar"), color = "orange")
   })
   #------------------------------------------------------------------------------------------------------------#
@@ -312,15 +300,24 @@ output$box_previsto_nao_exec <- renderValueBox({
       select(REGIÃO, FINANCEIRO_PREVISTO, FINANCEIRO_REALIZADO, PERCENTUAL_FINANCEIRO,
              FISICO_PREVISTO, FISICO_REALIZADO, PERCENTUAL_FISICO) %>%
       datatable(extensions = 'Buttons',
-                options = list(pageLength = 12, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')),
+                options = list(pageLength = 12, 
+                               dom = 'Bfrtip', 
+                               buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                               searching = FALSE),
                 colnames = c("Região", "Financeiro Previsto", "Financeiro Realizado", "Execução Financeira (%)",
                              "Físico Previsto", "Físico Realizado", "Execução Física (%)")) %>%
       formatRound("PERCENTUAL_FINANCEIRO", 0) %>%
       formatRound("PERCENTUAL_FISICO", 0) %>%
-      formatStyle("PERCENTUAL_FINANCEIRO", background = styleColorBar(range(0, 100), 'lightblue'),
-                  backgroundSize = '100% 90%', backgroundRepeat = 'no-repeat', backgroundPosition = 'center') %>%
-      formatStyle("PERCENTUAL_FISICO", background = styleColorBar(range(0, 100), 'lightgreen'),
-                  backgroundSize = '100% 90%', backgroundRepeat = 'no-repeat', backgroundPosition = 'center')
+      formatStyle("PERCENTUAL_FINANCEIRO", 
+                  background = styleColorBar(range(0, 100), 'lightblue'),
+                  backgroundSize = '100% 90%', 
+                  backgroundRepeat = 'no-repeat', 
+                  backgroundPosition = 'center') %>%
+      formatStyle("PERCENTUAL_FISICO", 
+                  background = styleColorBar(range(0, 100), 'lightgreen'),
+                  backgroundSize = '100% 90%', 
+                  backgroundRepeat = 'no-repeat', 
+                  backgroundPosition = 'center')
   })
   
   #----------------- TABELA MUNICPIPIOS ATENDIDOS -------------------------------------------------------------#
@@ -335,9 +332,13 @@ output$box_previsto_nao_exec <- renderValueBox({
     df$ANO <- as.character(df$ANO)
     total_row$ANO <- as.character(total_row$ANO)
     df_com_total <- bind_rows(df, total_row) %>% select(-SETOR, -ANO)
-    datatable(df_com_total, extensions = 'Buttons', options = list(pageLength = 20, dom = 'Bfrtip',
-                                                                   buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
-                                                                   scrollX = TRUE))
+    datatable(df_com_total, 
+              extensions = 'Buttons', 
+              options = list(pageLength = 20, 
+                             dom = 'Bfrtip',
+                             buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                             scrollX = TRUE,
+                             searching = FALSE))
   })
   #-----------------------------------------------------------------------------------------------------------------#
   observe({
@@ -410,7 +411,7 @@ output$box_previsto_nao_exec <- renderValueBox({
                              buttons = c('copy', 'csv', 'excel', 'pdf', 'print'), 
                              scrollX = TRUE,
                              scrollY = "400px",  # Adicionando rolagem vertical
-                             searching = TRUE  # Habilita a pesquisa
+                             searching = FALSE  # Habilita a pesquisa
               ))
   })
   #------------------------------------------------------------------------------#  
