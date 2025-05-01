@@ -28,7 +28,8 @@ dados_desdobramento$REGIAO <- trimws(dados_desdobramento$REGIAO)
 
 # Interface
 ui <- dashboardPage(
-  dashboardHeader(title = "PLANO PLURIANUAL 2020-2024", titleWidth = 400),
+  dashboardHeader(
+    title = "PANORAMA DO PLANO PLURIANUAL", titleWidth = 400),
   dashboardSidebar(
     tags$img(src = "detran1.jpeg", width = 230, height = 140),
     useShinyjs(),
@@ -43,8 +44,9 @@ ui <- dashboardPage(
                fluidRow(
                  valueBoxOutput("box_fin_prev", width = 3),
                  valueBoxOutput("box_fin_real", width = 3),
-                 valueBoxOutput("box_fis_prev", width = 3),
-                 valueBoxOutput("box_fis_real", width = 3)
+                 valueBoxOutput("box_fis_prev", width = 2),
+                 valueBoxOutput("box_fis_real", width = 2),
+                 valueBoxOutput("box_execucao_total", width = 2)
                ),
                br(),
                fluidRow(
@@ -65,16 +67,11 @@ ui <- dashboardPage(
       ),
       tabPanel("ATIVIDADES", icon = icon("calendar-check"),
                fluidRow(
-                 column(2, selectInput("ano_atividade", "ANO:", choices = NULL, selected = 2024)),
+                 column(1, selectInput("ano_atividade", "ANO:", choices = NULL, selected = 2024)),
                  column(2, selectInput("setor_atividade", "SETOR:", choices = NULL)),
-                 column(3, selectInput("regiao_atividade", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
-                 column(2, selectInput("municipio_atividade", "MUNICÍPIO:", choices = NULL, selected = 'SANTARÉM')),
+                 column(2, selectInput("regiao_atividade", "REGIÃO INTEGRAÇÃO:", choices = NULL, selected = 'BAIXO AMAZONAS')),
+                 column(3, selectInput("municipio_atividade", "MUNICÍPIO:", choices = NULL, selected = 'SANTARÉM')),
                  column(3, actionButton("reset_atividade", "LIMPAR FILTROS", icon = icon("redo")))
-               ),
-               br(),
-               fluidRow(
-                 # Linha separada para o valueBox
-                 # valueBoxOutput("pessoas_atendidas", width = 12)  # Ocupa toda a linha
                ),
                br(),
                fluidRow(
@@ -82,31 +79,77 @@ ui <- dashboardPage(
                )
       ),
       
-    tabPanel("NÃO EXECUTADO", icon = icon("times-circle"),
-         fluidRow(
-           column(2, selectInput("ano_nao_exec", "ANO:", choices = NULL, selected = 2024)),
-           column(2, selectInput("setor_nao_exec", "SETOR:", choices = NULL, selected = "EDUCAÇÃO")),
-           column(2, selectInput("regiao_nao_exec", "REGIÃO INTEGRAÇÃO:", choices = NULL)),
-           #column(2, selectInput("municipio_nao_exec", "MUNICÍPIO:", choices = NULL)),
-           column(2, actionButton("reset_nao_exec", "LIMPAR FILTROS", icon = icon("redo"))),
-           column(2, valueBoxOutput("box_previsto_nao_exec", width = 12)),
-           column(2, valueBoxOutput("total_financeiro_previsto_nao_exec", width = 12))
-         ),
-         br(),
-         fluidRow(
-           column(12, withSpinner(DTOutput("tabela_nao_executado")))
-         )
-)
-
-      
-      
- 
+      tabPanel("NÃO EXECUTADO", icon = icon("times-circle"),
+               fluidRow(
+                 column(1, selectInput("ano_nao_exec", "ANO:", choices = NULL, selected = 2024)),
+                 column(2, selectInput("setor_nao_exec", "SETOR:", choices = NULL, selected = "EDUCAÇÃO")),
+                 column(2, selectInput("regiao_nao_exec", "REGIÃO INTEGRAÇÃO:", choices = NULL)),
+                 column(1, actionButton("reset_nao_exec", "LIMPAR", icon = icon("redo"))),
+                 column(3, valueBoxOutput("box_previsto_nao_exec", width = 12)),
+                 column(3, valueBoxOutput("total_setor", width = 12))
+               ),
+               br(),
+               fluidRow(
+                 column(12, withSpinner(DTOutput("tabela_nao_executado")))
+               )
+      )
     )
   )
 )
 
 # Servidor
 server <- function(input, output, session) {
+  
+  
+  output$box_execucao_total <- renderValueBox({
+    total_exec_real <- dados %>%
+      filter(ANO == input$ano) %>%
+      summarise(total = sum(FINANCEIRO_REALIZADO, na.rm = TRUE)) |>
+      pull(total)
+    
+    valueBox(
+      subtitle = "Realizado Geral (R$)",
+      value = HTML(paste0('<span style="font-size:22px">R$ ', format(total_exec_real, big.mark = ".", decimal.mark = ","), '</span>')),
+      icon = icon("coins"),
+      color = "purple"
+    )
+  })
+  
+  
+  
+  
+  output$total_setor <- renderValueBox({
+    req(input$ano_nao_exec)
+    
+    # Soma o valor financeiro previsto para todo o setor (sem filtro de região)
+    total_setor <- dados_nao_executado %>%
+      filter(ANO == input$ano_nao_exec) %>%
+      summarise(total = sum(FINANCEIRO_PREVISTO, na.rm = TRUE)) %>%
+      pull(total)
+    
+    # Se não houver dados para o ano, define o valor como 0
+    if (is.na(total_setor)) {
+      total_setor <- 0
+    }
+    
+    # Cria o valueBox para o total geral do setor
+    valueBox(
+      #value = paste("R$", scales::comma(total_setor, accuracy = 1)),
+      value = HTML(paste0('<span style="font-size:24px">R$ ', format(total_setor, big.mark = ".", decimal.mark = ","), '</span>')),
+      subtitle = "Total Geral",
+      icon = icon("industry"),
+      color = "blue"
+    )
+  })
+
+
+  
+  
+  
+  
+  
+  
+  
   
   observeEvent(input$reset, {
     updateSelectInput(session, "setor", choices = sort(unique(dados$SETOR)), selected = NULL)
@@ -188,7 +231,6 @@ server <- function(input, output, session) {
     if (!is.null(input$ano_nao_exec)) df <- df %>% filter(ANO == input$ano_nao_exec)
     if (!is.null(input$setor_nao_exec)) df <- df %>% filter(SETOR == input$setor_nao_exec)
     if (!is.null(input$regiao_nao_exec)) df <- df %>% filter(REGIAO == input$regiao_nao_exec)
-    #if (!is.null(input$municipio_nao_exec)) df <- df %>% filter(MUNICIPIO == input$municipio_nao_exec)
     df
   })
 #------------------------------------------------------------------------------------------------#
@@ -220,82 +262,41 @@ output$box_previsto_nao_exec <- renderValueBox({
   total_previsto <- sum(df$FINANCEIRO_PREVISTO, na.rm = TRUE)
   
   valueBox(
-    subtitle = "Financeiro Previsto (Não Executado)",
-    value = scales::dollar(total_previsto, prefix = "R$ ", big.mark = ".", decimal.mark = ","),
+    subtitle = "Financeiro(Não Executado)",
+    value = HTML(paste0('<span style="font-size:24px">R$ ', format(total_previsto, big.mark = ".", decimal.mark = ","), '</span>')),
+    #value = scales::dollar(total_previsto, prefix = "R$ ", big.mark = ".", decimal.mark = ","),
     icon = icon("money-bill-wave"),
     color = "red"
   )
 })
+
   
-# Dados reativos filtrados
-df_nao_executado <- reactive({
-  df <- subset(dados, `SITUAÇÃO` == "NÃO EXECUTADO")
-  
-  if (input$regiao_nao_exec != "Todos") {
-    df <- df[df$`REGIÃO INTEGRAÇÃO` == input$regiao_nao_exec, ]
-  }
-  
-  if (!is.null(input$municipio_nao_exec) && input$municipio_nao_exec != "Todos") {
-    df <- df[df$MUNICÍPIO == input$municipio_nao_exec, ]
-  }
-  
-  df
-})
-  
-# valueBox: Total Financeiro Previsto (geral)
-#output$total_financeiro_previsto_nao_exec <- renderValueBox({
-#  df <- dados_nao_exec_filtrados()
-#  total <- sum(df$FINANCEIRO_PREVISTO, na.rm = TRUE)  # Ajuste conforme necessidade
-#  
-#  valueBox(
-#    subtitle = "Outro Indicador",  # Ajuste o título conforme desejado
-#    value = scales::dollar(total, prefix = "R$ ", big.mark = ".", decimal.mark = ","),
-#    icon = icon("chart-line"),
-#    color = "orange"
-#  )
-#})
+
   
   
-  
-  
-  
-  
-  
-  #--------------------------------------- CAIXAS DE VALORES ---------------------------------------------------#
-  # Cálculo do total de atividades filtradas
-  
-  #output$total_atividades <- renderValueBox({
-  #   total_atividades <- nrow(dados_atividade_filtrados())  # Total de atividades filtradas
-  #  valueBox(total_atividades,
-  #           "Atividades Realizadas",
-  #           icon = icon("calendar-check"),
-  #           color = "blue", 
-  #           width = 2)  # Ocupa toda a largura disponível
-  # })
-  
-  
+#--------------------------------------- CAIXAS DE VALORES ---------------------------------------------------#
   output$box_fin_prev <- renderValueBox({
     total <- sum(dados_filtrados()$FINANCEIRO_PREVISTO, na.rm = TRUE)
     valueBox("R$ " %>% paste0(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 2)),
-             "Execução Financeira - Previsto (R$)", icon = icon("money-bill"), color = "blue")
+             "Previsto (R$)", icon = icon("money-bill"), color = "blue")
   })
   
   output$box_fin_real <- renderValueBox({
     total <- sum(dados_filtrados()$FINANCEIRO_REALIZADO, na.rm = TRUE)
     valueBox("R$ " %>% paste0(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 2)),
-             "Execução Financeira - Realizado (R$)", icon = icon("check-circle"), color = "green")
+             "Realizado (R$)", icon = icon("check-circle"), color = "green")
   })
   
   output$box_fis_prev <- renderValueBox({
     total <- sum(dados_filtrados()$FISICO_PREVISTO, na.rm = TRUE)
     valueBox(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 0),
-             "Execução Física - Previsto (un)", icon = icon("chart-line"), color = "teal")
+             "Previsto (Físico)", icon = icon("chart-line"), color = "teal")
   })
   
   output$box_fis_real <- renderValueBox({
     total <- sum(dados_filtrados()$FISICO_REALIZADO, na.rm = TRUE)
     valueBox(formatC(total, format = "f", big.mark = ".", decimal.mark = ",", digits = 0),
-             "Execução Física - Realizado (un)", icon = icon("chart-bar"), color = "orange")
+             "Realizado (Físico)", icon = icon("chart-bar"), color = "orange")
   })
   #------------------------------------------------------------------------------------------------------------#
   
